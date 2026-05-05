@@ -11,6 +11,7 @@ E - Agentic guard (L9)
 F - Observability + feedback (L10)
 """
 
+import os
 import math
 import re
 from dataclasses import dataclass, field
@@ -72,23 +73,34 @@ class PerplexityScorer:
         return 20.0  # Normal
 
 class MLClassifierMiniBERT:
-    """L4: ML classifier - fine-tuned DeBERTa model"""
-    def __init__(self):
+    """L4: Deep semantic intent classification using DeBERTa"""
+    def __init__(self, model_name: str = "ProtectAI/deberta-v3-base-prompt-injection-v2"):
+        self.available = False
+        self.classifier = None
+        
+        # Check if a fine-tuned model exists locally
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        fine_tuned_path = os.path.join(script_dir, "fine_tuned_deberta")
+        
+        if os.path.exists(fine_tuned_path):
+            model_to_load = fine_tuned_path
+            print(f"Loading CUSTOM Fine-Tuned ML Classifier ({model_to_load})...")
+        else:
+            model_to_load = model_name
+            print(f"Loading ML Classifier ({model_to_load})...")
+            
         try:
             from transformers import pipeline
             import torch
-            device = 0 if torch.cuda.is_available() else -1
-            print("Loading ML Classifier (ProtectAI/deberta-v3-base-prompt-injection-v2)...")
             self.classifier = pipeline(
                 "text-classification", 
-                model="ProtectAI/deberta-v3-base-prompt-injection-v2", 
-                device=device
+                model=model_to_load, 
+                device=0 if torch.cuda.is_available() else -1
             )
             self.available = True
             print("ML Classifier loaded successfully!")
         except Exception as e:
             print(f"Failed to load ML Classifier: {e}")
-            self.available = False
 
     def predict(self, text: str) -> float:
         if not self.available:

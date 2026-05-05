@@ -3,3 +3,7 @@ __pycache__/
 detections.json
 test_detections.json
 .env
+fine_tuned_deberta/
+*.safetensors
+training_args.bin
+mistakes.json

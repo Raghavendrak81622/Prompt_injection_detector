@@ -2,3 +2,5 @@ anthropic>=0.40.0
 transformers
 torch
 sentencepiece
+datasets
+accelerate
