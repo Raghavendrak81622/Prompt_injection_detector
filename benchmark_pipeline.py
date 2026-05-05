@@ -41,17 +41,19 @@ def main():
     }
     
     latencies = []
-    
-    print(f"\nRunning {len(dataset)} tests...")
+    # --- Run Batch Processing ---
+    print(f"\nRunning {len(dataset)} tests in batch mode...")
     print("-" * 70)
     print(f"{'STATUS':<10} | {'VERDICT':<10} | {'LATENCY':<8} | {'PROMPT'}")
     print("-" * 70)
 
-    for text, expected_malicious, category in dataset:
-        start_req = time.time()
-        result = pipeline.run(text)
-        latency = time.time() - start_req
-        latencies.append(latency)
+    prompts_to_run = [d[0] for d in dataset]
+    start_batch = time.time()
+    results = pipeline.run_batch(prompts_to_run)
+    batch_latency = (time.time() - start_batch) * 1000
+    
+    for i, (text, expected_malicious, category) in enumerate(dataset):
+        result = results[i]
         
         # In our pipeline, BLOCKED or SANITIZED means it caught something
         actual_malicious = (result.status in ["BLOCKED", "SANITIZED", "REWRITTEN"])
@@ -69,7 +71,7 @@ def main():
             stats["fn"] += 1
             icon = "❌ FN"
 
-        print(f"{icon:<10} | {result.verdict:<10} | {latency*1000:>6.1f}ms | {text[:45]}...")
+        print(f"{icon:<10} | {result.verdict:<10} | {'batch':>8} | {text[:45]}...")
 
     # --- Calculate Metrics ---
     total = len(dataset)
@@ -77,18 +79,17 @@ def main():
     precision = stats["tp"] / (stats["tp"] + stats["fp"]) if (stats["tp"] + stats["fp"]) > 0 else 0
     recall = stats["tp"] / (stats["tp"] + stats["fn"]) if (stats["tp"] + stats["fn"]) > 0 else 0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    avg_latency = sum(latencies) / total * 1000
 
     print("\n" + "═" * 70)
-    print("  📊 PERFORMANCE METRICS")
+    print("  📊 PERFORMANCE METRICS (BATCH MODE)")
     print("═" * 70)
     print(f"  Overall Accuracy:  {accuracy:>7.2%}")
-    print(f"  Precision:         {precision:>7.2%} (How many blocks were correct)")
-    print(f"  Recall:            {recall:>7.2%} (How many injections were caught)")
+    print(f"  Precision:         {precision:>7.2%}")
+    print(f"  Recall:            {recall:>7.2%}")
     print(f"  F1-Score:          {f1:>7.2%}")
     print("-" * 70)
-    print(f"  Avg Latency:       {avg_latency:>7.1f}ms")
-    print(f"  Max Latency:       {max(latencies)*1000:>7.1f}ms")
+    print(f"  Total Batch Time:  {batch_latency:>7.1f}ms")
+    print(f"  Avg per prompt:    {batch_latency/total:>7.1f}ms")
     print(f"  Total TP/TN:       {stats['tp']}/{stats['tn']}")
     print(f"  Total FP/FN:       {stats['fp']}/{stats['fn']}")
     print("═" * 70 + "\n")

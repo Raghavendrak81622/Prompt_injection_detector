@@ -111,6 +111,28 @@ class MLClassifierMiniBERT:
             print(f"Prediction error: {e}")
             return 0.0
 
+    def predict_batch(self, texts: List[str]) -> List[float]:
+        if not self.available:
+            return [0.0] * len(texts)
+            
+        try:
+            # Truncate all texts
+            truncated = [t[:2000] for t in texts]
+            results = self.classifier(truncated, batch_size=8)
+            
+            scores = []
+            for result in results:
+                label = result['label'].upper()
+                score = result['score']
+                if "INJECTION" in label:
+                    scores.append(score)
+                else:
+                    scores.append(1.0 - score)
+            return scores
+        except Exception as e:
+            print(f"Batch prediction error: {e}")
+            return [0.0] * len(texts)
+
 class OutputValidator:
     """L7: Output validator - critic model"""
     def validate(self, original_input: str, llm_output: str) -> bool:
@@ -156,64 +178,74 @@ class GuardrailPipeline:
         self.monitor = SessionMonitor()
 
     def run(self, text: str, session_id: str = "default", mock_llm_response: str = None, mock_tools: List[ToolCall] = None) -> PipelineResult:
-        """Runs the full 10-layer pipeline."""
+        """Runs the full 10-layer pipeline for a single input."""
+        return self.run_batch([text], session_id, [mock_llm_response] if mock_llm_response else None, [mock_tools] if mock_tools else None)[0]
+
+    def run_batch(self, texts: List[str], session_id: str = "default", mock_llm_responses: List[str] = None, mock_tools_list: List[List[ToolCall]] = None) -> List[PipelineResult]:
+        """Runs the full 10-layer pipeline in optimized batches."""
         
         # --- A. Input boundary ---
-        # L0
+        # L0 (mock session for all)
         session = self.router.load_session(session_id)
-        # L1
-        isolated_text = self.isolator.isolate(text)
-        # L2
-        px_score = self.perplexity.score(text)
-        if px_score > 75.0:
-            return PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="High perplexity (obfuscation detected)", layer_triggered="L2")
-
-        # --- B. Detection ---
-        # L3 & L5 are handled by detector
-        detect_result = self.detector.detect(text)
         
-        # L4 (parallel to L3)
-        ml_score = self.ml_classifier.predict(text)
+        # L1 & L2 (preprocess each)
+        preprocessed_data = []
+        for text in texts:
+            preprocessed_data.append({
+                "text": text,
+                "isolated": self.isolator.isolate(text),
+                "px": self.perplexity.score(text)
+            })
+
+        # --- B. Detection (Batched) ---
+        # L3 & L5 (Rule Engine & LLM)
+        detect_results = self.detector.detect_batch(texts)
         
-        # --- C. Pre-execution gate ---
-        # L6
-        final_verdict = detect_result.verdict
-        if ml_score > 0.9:
-            final_verdict = "INJECTION"
-            
-        if final_verdict == "INJECTION":
-            return PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="Detection engine flagged input", layer_triggered="L6")
-        elif final_verdict == "SUSPICIOUS":
-            # Sanitize by enforcing strict boundaries
-            processed_input = f"Strictly answer the following: {isolated_text}"
-            status = "SANITIZED"
-        else:
-            processed_input = text
-            status = "ALLOWED"
-
-        # --- LLM Inference (Mocked) ---
-        llm_output = mock_llm_response if mock_llm_response else "This is a safe response."
-        tools = mock_tools if mock_tools else []
-
-        # --- E. Agentic guard ---
-        # L9
-        if not self.tool_validator.validate_tools(tools):
-            return PipelineResult("BLOCKED", text, processed_input, verdict="INJECTION", reason="Malicious tool call blocked", layer_triggered="L9")
-
-        # --- D. Post-generation validation ---
-        # L7
-        if not self.output_validator.validate(text, llm_output):
-            # L8
-            llm_output = self.arr.rewrite(llm_output)
-            status = "REWRITTEN"
-            layer = "L8"
-        else:
-            layer = "L7 (Pass)"
-
-        res = PipelineResult(status, text, processed_input, llm_output, verdict="SAFE", reason="Passed all checks", layer_triggered=layer)
+        # L4 (ML Classifier Batched)
+        ml_scores = self.ml_classifier.predict_batch(texts)
         
-        # --- F. Observability ---
-        # L10
-        self.monitor.monitor(session, res)
-        
-        return res
+        # --- C. Pre-execution & Beyond ---
+        pipeline_results = []
+        for i, text in enumerate(texts):
+            p_data = preprocessed_data[i]
+            d_res = detect_results[i]
+            ml_score = ml_scores[i]
+
+            if p_data["px"] > 75.0:
+                res = PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="High perplexity (obfuscation detected)", layer_triggered="L2")
+                pipeline_results.append(res)
+                continue
+
+            final_verdict = d_res.verdict
+            if ml_score > 0.9:
+                final_verdict = "INJECTION"
+            elif ml_score > 0.5 and final_verdict == "SAFE":
+                final_verdict = "SUSPICIOUS"
+
+            if final_verdict == "INJECTION":
+                res = PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="Detection engine flagged input", layer_triggered="L6")
+            elif final_verdict == "SUSPICIOUS":
+                res = PipelineResult("SANITIZED", text, f"Strictly answer: {p_data['isolated']}", verdict="SUSPICIOUS", reason="Suspicious signals detected", layer_triggered="L6")
+            else:
+                res = PipelineResult("ALLOWED", text, text, verdict="SAFE", reason="Passed all checks", layer_triggered="L7 (Pass)")
+
+            # Mock LLM inference and Post-generation
+            if res.status != "BLOCKED":
+                llm_output = mock_llm_responses[i] if mock_llm_responses and i < len(mock_llm_responses) else "Safe response."
+                tools = mock_tools_list[i] if mock_tools_list and i < len(mock_tools_list) else []
+                
+                # L9 Agentic Guard
+                if not self.tool_validator.validate_tools(tools):
+                    res = PipelineResult("BLOCKED", text, res.final_input, verdict="INJECTION", reason="Malicious tool call blocked", layer_triggered="L9")
+                else:
+                    # L7 Output Validator
+                    if not self.output_validator.validate(text, llm_output):
+                        llm_output = self.arr.rewrite(llm_output)
+                        res.status = "REWRITTEN"
+                        res.layer_triggered = "L8"
+                    res.llm_output = llm_output
+
+            pipeline_results.append(res)
+            self.monitor.monitor(session, res)
+
+        return pipeline_results
