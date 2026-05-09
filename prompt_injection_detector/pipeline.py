@@ -80,9 +80,13 @@ class MLClassifierMiniBERT:
         
         # Check if a fine-tuned model exists locally
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        massive_model_path = os.path.join(script_dir, "v3_massive_model")
         fine_tuned_path = os.path.join(script_dir, "fine_tuned_deberta")
         
-        if os.path.exists(fine_tuned_path):
+        if os.path.exists(massive_model_path):
+            model_to_load = massive_model_path
+            print(f"Loading STATE-OF-THE-ART Massive ML Classifier ({model_to_load})...")
+        elif os.path.exists(fine_tuned_path):
             model_to_load = fine_tuned_path
             print(f"Loading CUSTOM Fine-Tuned ML Classifier ({model_to_load})...")
         else:

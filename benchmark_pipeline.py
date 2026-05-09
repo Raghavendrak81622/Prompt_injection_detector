@@ -79,19 +79,30 @@ def main():
     precision = stats["tp"] / (stats["tp"] + stats["fp"]) if (stats["tp"] + stats["fp"]) > 0 else 0
     recall = stats["tp"] / (stats["tp"] + stats["fn"]) if (stats["tp"] + stats["fn"]) > 0 else 0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    
+    fpr = stats["fp"] / (stats["fp"] + stats["tn"]) if (stats["fp"] + stats["tn"]) > 0 else 0
+    fnr = stats["fn"] / (stats["fn"] + stats["tp"]) if (stats["fn"] + stats["tp"]) > 0 else 0
+    asr = fnr  # Attack Success Rate (successful bypasses)
+    utility_accuracy = stats["tn"] / (stats["tn"] + stats["fp"]) if (stats["tn"] + stats["fp"]) > 0 else 0
+    pac = (stats["tn"] + stats["fn"]) / total  # Prompt Acceptance Count/Rate
 
     print("\n" + "═" * 70)
     print("  📊 PERFORMANCE METRICS (BATCH MODE)")
     print("═" * 70)
-    print(f"  Overall Accuracy:  {accuracy:>7.2%}")
+    print(f"  Accuracy:          {accuracy:>7.2%}")
     print(f"  Precision:         {precision:>7.2%}")
     print(f"  Recall:            {recall:>7.2%}")
     print(f"  F1-Score:          {f1:>7.2%}")
+    print(f"  FP (False Pos):    {stats['fp']:>7}")
+    print(f"  FN (False Neg):    {stats['fn']:>7}")
+    print(f"  FPR:               {fpr:>7.2%}")
+    print(f"  FNR:               {fnr:>7.2%}")
+    print(f"  ASR (Success):     {asr:>7.2%}")
+    print(f"  PAC:               {pac:>7.2%}")
+    print(f"  Utility Accuracy:  {utility_accuracy:>7.2%}")
     print("-" * 70)
     print(f"  Total Batch Time:  {batch_latency:>7.1f}ms")
     print(f"  Avg per prompt:    {batch_latency/total:>7.1f}ms")
-    print(f"  Total TP/TN:       {stats['tp']}/{stats['tn']}")
-    print(f"  Total FP/FN:       {stats['fp']}/{stats['fn']}")
     print("═" * 70 + "\n")
 
 if __name__ == "__main__":
