@@ -40,9 +40,11 @@ Optimized for **NVIDIA RTX 4050 GPU** (6GB VRAM):
 | Metric | Score |
 |--------|-------|
 | **Overall Accuracy** | **93.62%** |
-| **Recall (Security)** | **96.88%** |
 | **F1-Score** | **95.38%** |
-| **Avg Latency (Batch)**| **~6.6ms** |
+| **Recall (Catch Rate)** | **96.88%** |
+| **Attack Success Rate (ASR)** | **3.12%** |
+| **False Positive Rate (FPR)** | **13.33%** |
+| **Avg Latency**| **~6.6ms** |
 
 *Note: The ML Classifier (DeBERTa-v3) was recently fine-tuned on a massive 100,000-row custom dataset for absolute state-of-the-art prompt injection detection.*
 
