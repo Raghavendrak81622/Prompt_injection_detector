@@ -1,0 +1,26 @@
+# Virtual Environment
+venv/
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Datasets (Too large for GitHub)
+massive_dataset/
+*.jsonl
+
+# Models (Too large for GitHub - >100MB)
+v3_massive_model/
+fine_tuned_deberta/
+checkpoint-*/
+
+# Logs
+test_detections.json
+training_log.json
+
+# System
+.DS_Store
+Thumbs.db
