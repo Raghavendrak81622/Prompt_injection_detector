@@ -196,11 +196,11 @@ class GuardrailPipeline:
         self.monitor = SessionMonitor()
 
     def run(self, text: str, session_id: str = "default", mock_llm_response: str = None, mock_tools: List[ToolCall] = None) -> PipelineResult:
-        """Runs the full 10-layer pipeline for a single input."""
+        """Runs the full 9-layer pipeline for a single input."""
         return self.run_batch([text], session_id, [mock_llm_response] if mock_llm_response else None, [mock_tools] if mock_tools else None)[0]
 
     def run_batch(self, texts: List[str], session_id: str = "default", mock_llm_responses: List[str] = None, mock_tools_list: List[List[ToolCall]] = None) -> List[PipelineResult]:
-        """Runs the full 10-layer pipeline in optimized batches."""
+        """Runs the full 9-layer pipeline in optimized batches."""
         
         # --- A. Input boundary ---
         # L0 (mock session for all)

@@ -3,7 +3,7 @@
 PDF Prompt Injection Scanner
 -----------------------------
 Extracts text from a PDF file, splits it into manageable chunks,
-and runs each chunk through the 10-layer GuardrailPipeline to detect
+and runs each chunk through the 9-layer GuardrailPipeline to detect
 any embedded prompt injection attacks.
 
 Usage:

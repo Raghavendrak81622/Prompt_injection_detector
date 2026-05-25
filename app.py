@@ -2,7 +2,7 @@
 """
 GuardRail AI — Flask Web Server
 ---------------------------------
-Exposes the 10-layer GuardrailPipeline and the PDF scanner
+Exposes the 9-layer GuardrailPipeline and the PDF scanner
 as a REST API consumed by the frontend.
 
 Endpoints:

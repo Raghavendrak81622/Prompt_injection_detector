@@ -19,6 +19,7 @@ checkpoint-*/
 
 # Logs
 test_detections.json
+detections.json
 training_log.json
 
 # System

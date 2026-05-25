@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Benchmark script for the 10-layer Guardrail Pipeline.
+Benchmark script for the 9-layer Guardrail Pipeline.
 Calculates Accuracy, Precision, Recall, and Latency.
 """
 

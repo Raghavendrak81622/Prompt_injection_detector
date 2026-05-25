@@ -47,12 +47,12 @@ def main():
             if not user_input:
                 continue
                 
-            # Optional: Let the user mock an LLM response or tool call if they want to test L7-L9,
+            # Optional: Let the user mock an LLM response or tool call if they want to test L5-L7,
             # but for simplicity, we'll use a generic safe LLM response
             mock_llm_response = "I am a helpful assistant."
             mock_tools = []
             
-            print("\n⚙️  Running through 10-Layer Guardrail...")
+            print("\n⚙️  Running through 9-Layer Guardrail...")
             result = pipeline.run(
                 text=user_input, 
                 mock_llm_response=mock_llm_response, 

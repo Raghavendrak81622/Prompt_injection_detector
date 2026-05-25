@@ -5,3 +5,6 @@ datasets
 accelerate
 huggingface_hub
 pymupdf
+Flask
+Flask-Cors
+
