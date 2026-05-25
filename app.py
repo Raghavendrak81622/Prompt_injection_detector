@@ -140,6 +140,7 @@ def analyze_pdf():
             overlap=overlap,
             batch_size=batch_size,
             verbose=False,
+            pipeline=pipeline,
         )
 
         # Serialize report

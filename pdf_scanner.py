@@ -28,7 +28,7 @@ import json
 import argparse
 import time
 from dataclasses import dataclass, asdict
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 # Ensure the project root is on the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -168,6 +168,7 @@ def scan_pdf(
     overlap: int = 50,
     verbose: bool = False,
     batch_size: int = 8,
+    pipeline: Optional[GuardrailPipeline] = None,
 ) -> PDFScanReport:
     """
     Full PDF scan pipeline:
@@ -196,8 +197,9 @@ def scan_pdf(
     print(f"   [OK] Split into {len(chunks)} chunk(s) (chunk_size={chunk_size}, overlap={overlap})")
 
     # Step 3: Initialize pipeline (only once)
-    print("\n[INIT] Initializing GuardrailPipeline...")
-    pipeline = GuardrailPipeline()
+    if pipeline is None:
+        print("\n[INIT] Initializing GuardrailPipeline...")
+        pipeline = GuardrailPipeline()
 
     # Step 4: Run in batches
     print(f"\n[SCAN] Scanning {len(chunks)} chunk(s) in batches of {batch_size}...")
