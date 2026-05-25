@@ -1,19 +1,4 @@
----
-language: en
-license: mit
-library_name: transformers
-tags:
-- prompt-injection
-- security
-- guardrail
-- deberta-v3
-datasets:
-- tatsu-lab/alpaca
-- imoxto/prompt_injection_cleaned_dataset
-metrics:
-- accuracy
-- f1
----
+
 
 # 🛡️ 9-Layer Prompt Injection Guardrail Pipeline
 
