@@ -24,3 +24,9 @@ training_log.json
 # System
 .DS_Store
 Thumbs.db
+
+# Reports and document files
+*report*
+*Report*
+*.docx
+
