@@ -42,7 +42,7 @@ class Learner:
         rule_score: float,
         verdict: str,
         categories: list,
-        llm_verdict: Optional[str] = None,
+        autosave: bool = True,
     ) -> str:
         """
         Store a detection result.  Returns a unique ID for later feedback.
@@ -58,12 +58,31 @@ class Learner:
             "rule_score": rule_score,
             "verdict": verdict,
             "categories": categories,
-            "llm_verdict": llm_verdict,
             "feedback": None,   # "tp" | "fp" | "fn"
         }
         self._log.append(entry)
-        self._save()
+        if autosave:
+            self._save()
         return entry_id
+
+    def record_batch(self, entries: list[dict]):
+        """Store multiple results and save once."""
+        for entry in entries:
+            eid = hashlib.md5(
+                (entry["text"] + datetime.utcnow().isoformat()).encode()
+            ).hexdigest()[:12]
+            
+            log_entry = {
+                "id": eid,
+                "timestamp": datetime.utcnow().isoformat(),
+                "text_preview": entry["text"][:120],
+                "rule_score": entry["rule_score"],
+                "verdict": entry["verdict"],
+                "categories": entry["categories"],
+                "feedback": None,
+            }
+            self._log.append(log_entry)
+        self._save()
 
     def submit_feedback(self, entry_id: str, feedback: str) -> bool:
         """

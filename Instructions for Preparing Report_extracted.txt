@@ -1,0 +1,31 @@
+
+
+
+
+DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING
+AY: 2025-26 (Even Semester)
+24CSE48 - Mini Project
+Instructions for Preparing Project Report
+Project report should be typed neatly only on one side of the paper with 1.5 line spacing on a A4 size bond paper (210 x 297 mm). The margins should be: Left – 1.25″, Right – 1″, Top and Bottom – 0.75″. 
+Font - Calibri -Font Size-12, Sub Heading-16, Chapter and Chapter name-18.
+The number of copies of the report is 1+1.
+Carefully check the content of certificate page.
+Report shall contain minimum 50 pages excluding pages like cover, certificate, table of contents, list of figures and tables, and abstract.
+Follow exactly the sample template (line spacing, margins, font type and size, header and footer).
+Adhere to appropriate image and table descriptions.
+Follow the format for Certificate and cover page templates strictly. 
+The report shall be forwarded to the guide’s email id for plagiarism check. It shall contain only content from chapter 1 - introduction to references, Rename the file with your USN_TITLE OF PROJECT before sending. 
+Guide will send the reports similarity index. If the similarity index is more than 20%, students need to reduce the plagiarism and again send the report to guide for further check. Kindly note that only 2 attempts are allowed to do the plagiarism check.
+The report has to be soft binded with Yellow tape.
+The order of report should be
+Front page
+Certificate page
+Plagiarism report - only the page where similarity % is shown (to be signed by guide)
+Abstract
+Acknowledgment
+Content
+List of Figures (if applicable)
+List of tables (if applicable)
+Chapters
+Conclusion
+References 

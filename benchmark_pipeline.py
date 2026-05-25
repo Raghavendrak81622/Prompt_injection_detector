@@ -15,9 +15,9 @@ from prompt_injection_detector import GuardrailPipeline
 from test_prompts import SAFE_PROMPTS, SUSPICIOUS_PROMPTS, INJECTION_PROMPTS
 
 def main():
-    print("\n" + "═" * 70)
-    print("  🛡️  Guardrail Pipeline Benchmark")
-    print("═" * 70)
+    print("\n" + "=" * 70)
+    print("  [BENCHMARK] Guardrail Pipeline")
+    print("=" * 70)
     
     print("Initializing Pipeline (loading ML models to GPU)...")
     start_init = time.time()
@@ -60,16 +60,16 @@ def main():
         
         if actual_malicious and expected_malicious:
             stats["tp"] += 1
-            icon = "✅"
+            icon = "[OK]"
         elif not actual_malicious and not expected_malicious:
             stats["tn"] += 1
-            icon = "✅"
+            icon = "[OK]"
         elif actual_malicious and not expected_malicious:
             stats["fp"] += 1
-            icon = "❌ FP"
+            icon = "[FP]"
         else:
             stats["fn"] += 1
-            icon = "❌ FN"
+            icon = "[FN]"
 
         print(f"{icon:<10} | {result.verdict:<10} | {'batch':>8} | {text[:45]}...")
 
@@ -84,26 +84,65 @@ def main():
     fnr = stats["fn"] / (stats["fn"] + stats["tp"]) if (stats["fn"] + stats["tp"]) > 0 else 0
     asr = fnr  # Attack Success Rate (successful bypasses)
     utility_accuracy = stats["tn"] / (stats["tn"] + stats["fp"]) if (stats["tn"] + stats["fp"]) > 0 else 0
-    pac = (stats["tn"] + stats["fn"]) / total  # Prompt Acceptance Count/Rate
+    
+    # Latency and Confidence stats
+    latencies = [r.latency * 1000 for r in results if r.latency] # Convert to ms
+    # If latencies is empty (pipeline didn't provide individual latencies), use batch avg
+    if not latencies:
+        avg_lat = batch_latency / total
+        latencies = [avg_lat] * total
+    
+    latencies.sort()
+    p50 = latencies[int(len(latencies) * 0.5)]
+    p95 = latencies[int(len(latencies) * 0.95)]
+    p99 = latencies[int(len(latencies) * 0.99)]
+    
+    confidences = [r.confidence for r in results]
+    avg_conf = sum(confidences) / len(confidences) if confidences else 0
+    
+    # Category-wise stats
+    cat_stats = defaultdict(lambda: {"total": 0, "correct": 0})
+    for i, (text, expected_malicious, category) in enumerate(dataset):
+        result = results[i]
+        actual_malicious = (result.status in ["BLOCKED", "SANITIZED", "REWRITTEN"])
+        cat_stats[category]["total"] += 1
+        if actual_malicious == expected_malicious:
+            cat_stats[category]["correct"] += 1
 
-    print("\n" + "═" * 70)
-    print("  📊 PERFORMANCE METRICS (BATCH MODE)")
-    print("═" * 70)
-    print(f"  Accuracy:          {accuracy:>7.2%}")
+    print("\n" + "=" * 70)
+    print("  ENHANCED PERFORMANCE METRICS")
+    print("=" * 70)
+    
+    print(f"  [ CORE CLASSIFICATION ]")
+    print(f"  Overall Accuracy:  {accuracy:>7.2%}")
     print(f"  Precision:         {precision:>7.2%}")
-    print(f"  Recall:            {recall:>7.2%}")
+    print(f"  Recall (Security): {recall:>7.2%}")
     print(f"  F1-Score:          {f1:>7.2%}")
-    print(f"  FP (False Pos):    {stats['fp']:>7}")
-    print(f"  FN (False Neg):    {stats['fn']:>7}")
-    print(f"  FPR:               {fpr:>7.2%}")
-    print(f"  FNR:               {fnr:>7.2%}")
-    print(f"  ASR (Success):     {asr:>7.2%}")
-    print(f"  PAC:               {pac:>7.2%}")
-    print(f"  Utility Accuracy:  {utility_accuracy:>7.2%}")
+    print(f"  Utility Accuracy:  {utility_accuracy:>7.2%} (True Neg Rate)")
+    
+    print(f"\n  [ SECURITY GATE METRICS ]")
+    print(f"  FPR (False Pos):   {fpr:>7.2%} (UX Friction)")
+    print(f"  FNR (False Neg):   {fnr:>7.2%} (Security Leak)")
+    print(f"  ASR (Attack Suc):  {asr:>7.2%} (Bypass Rate)")
+    print(f"  Total Missed:      {stats['fn']:>7}")
+    print(f"  Total False Alarms:{stats['fp']:>7}")
+    
+    print(f"\n  [ CATEGORICAL PERFORMANCE ]")
+    for cat, data in cat_stats.items():
+        cat_acc = data["correct"] / data["total"]
+        print(f"  {cat:<18}: {cat_acc:>7.2%} ({data['correct']}/{data['total']})")
+    
+    print(f"\n  [ LATENCY & THROUGHPUT ]")
+    print(f"  p50 (Median):      {p50:>7.1f} ms")
+    print(f"  p95 (Tail):        {p95:>7.1f} ms")
+    print(f"  p99 (Worst Case):  {p99:>7.1f} ms")
+    print(f"  Avg Latency:       {batch_latency/total:>7.1f} ms")
+    print(f"  Throughput:        {1000 / (batch_latency/total):>7.1f} prompts/sec")
+    
+    print(f"\n  [ CONFIDENCE ANALYSIS ]")
+    print(f"  Avg Confidence:    {avg_conf:>7.2%}")
     print("-" * 70)
-    print(f"  Total Batch Time:  {batch_latency:>7.1f}ms")
-    print(f"  Avg per prompt:    {batch_latency/total:>7.1f}ms")
-    print("═" * 70 + "\n")
+    print("=" * 70 + "\n")
 
 if __name__ == "__main__":
     main()

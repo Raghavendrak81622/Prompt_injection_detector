@@ -1,12 +1,29 @@
-# 🛡️ 10-Layer Prompt Injection Guardrail Pipeline
+---
+language: en
+license: mit
+library_name: transformers
+tags:
+- prompt-injection
+- security
+- guardrail
+- deberta-v3
+datasets:
+- tatsu-lab/alpaca
+- imoxto/prompt_injection_cleaned_dataset
+metrics:
+- accuracy
+- f1
+---
 
-A state-of-the-art, multi-layered security system designed to protect LLM-based applications from prompt injections, jailbreaking, and agentic exploitation. 
+# 🛡️ 9-Layer Prompt Injection Guardrail Pipeline
 
-This system moves beyond simple keyword matching by implementing a **10-Layer Defense Architecture** including GPU-accelerated transformer models, optimized batch processing, and post-generation validation.
+A state-of-the-art, fully local, multi-layered security system designed to protect LLM-based applications from prompt injections, jailbreaking, and agentic exploitation. 
+
+This system implements a **9-Layer Defense Architecture** including a fine-tuned **DeBERTa-v3** model, optimized batch processing, and post-generation validation.
 
 ---
 
-## 🏗️ 10-Layer Architecture
+## 🏗️ 9-Layer Architecture
 
 The system follows a rigorous multi-stage pipeline:
 
@@ -15,38 +32,45 @@ The system follows a rigorous multi-stage pipeline:
 *   **L1: SCPI (Structured Isolation):** Uses XML-style boundaries to isolate untrusted user input.
 *   **L2: Preprocessing + Perplexity Scoring:** Detects obfuscation (Base64, Rot13, etc.) using statistical analysis.
 
-### B — Detection
+### B — Detection & Decision
 *   **L3: Heuristic + Obfuscation Scanner:** 100+ regex patterns with advanced text normalisation.
-*   **L4: ML Classifier (GPU Batch Optimized):** Uses a fine-tuned **DeBERTa-v3** model (`ProtectAI/deberta-v3-base-prompt-injection-v2`) for semantic intent analysis.
-*   **L5: LLM Filter:** Optional high-level arbitration using Claude (Anthropic API).
+*   **L4: ML Classifier (GPU Batch Optimized):** Uses a custom fine-tuned **DeBERTa-v3** model for semantic intent analysis.
+    *(Note: Bypasses heavy LLM Classifiers to ensure zero network dependency, data privacy, and sub-15ms execution).*
 
-### C — Pre-execution Gate
-*   **L6: Decision Engine:** Aggregates scores from all detection layers to Block, Sanitize, or Allow the request.
+### C — Post-Generation Validation
+*   **L5: Output Validator:** A critic model that checks if the LLM output was hijacked.
+*   **L6: Adaptive Response Rewriter (ARR):** Automatically rewrites misaligned responses into safe fallbacks.
 
-### D — Agentic & Post-Generation (New)
-*   **L9: Tool-call Validator:** Blocks malicious agent actions (e.g., system execution) on a least-privilege basis.
-*   **L7: Output Validator:** A critic model that checks if the LLM output was hijacked or leaked internal instructions.
-*   **L8: Adaptive Response Rewriter (ARR):** Automatically rewrites misaligned responses into safe fallbacks.
+### D — Agentic Guard
+*   **L7: Tool-call Validator:** Blocks malicious agent actions on a least-privilege basis.
 
-### F — Observability
-*   **L10: Session Monitor:** Feedback loop that logs verdicts and identifies multi-turn anomalies.
+### E — Observability
+*   **L8: Session Monitor:** Feedback loop that logs verdicts and identifies multi-turn anomalies.
 
 ---
 
-## 📊 Performance Metrics (Locally Trained on 100k Dataset)
+## 📊 Performance Metrics
 
-Optimized for **NVIDIA RTX 4050 GPU** (6GB VRAM):
+The system is evaluated across multiple dimensions to ensure both **Security** (high recall) and **UX Utility** (low false positives). Optimized for **NVIDIA RTX 4050 GPU** (6GB VRAM).
 
+### 🛠️ Core Classifier Performance
+| Metric | Score | Impact |
+|--------|-------|--------|
+| **Overall Accuracy** | **92.05%** | General reliability across unseen adversarial prompts. |
+| **Recall (Security)** | **85.71%** | Ability to catch malicious injections. |
+| **Precision** | **96.13%** | Reliability of "Injection" verdicts (low false alarms). |
+| **F1-Score** | **90.62%** | Balanced harmonic mean of Precision & Recall. |
+
+### 🛡️ Security Gate Metrics
+| Metric | Score | Definition |
+|--------|-------|------------|
+| **FPR (False Pos)** | **2.80%** | UX Friction: Legitimate prompts incorrectly blocked. |
+| **ASR (Attack Suc)**| **14.29%** | Attack Success Rate: Ratio of successful injections on held-out data. |
+
+### ⚡ Latency & Throughput (Batch Mode)
 | Metric | Score |
 |--------|-------|
-| **Overall Accuracy** | **93.62%** |
-| **F1-Score** | **95.38%** |
-| **Recall (Catch Rate)** | **96.88%** |
-| **Attack Success Rate (ASR)** | **3.12%** |
-| **False Positive Rate (FPR)** | **13.33%** |
-| **Avg Latency**| **~6.6ms** |
-
-*Note: The ML Classifier (DeBERTa-v3) was recently fine-tuned on a massive 100,000-row custom dataset for absolute state-of-the-art prompt injection detection.*
+| **Throughput** | **179.6 prompts/sec** | (NVIDIA RTX 4050/6GB) |
 
 ---
 
@@ -56,8 +80,8 @@ Optimized for **NVIDIA RTX 4050 GPU** (6GB VRAM):
 
 ```bash
 # Clone the repository
-git clone https://github.com/Raghavendrak81622/Prompt_injection_detector.git
-cd Prompt_injection_detector
+git clone https://huggingface.co/raghavendrak8162/deberta-v3-prompt-injector
+cd deberta-v3-prompt-injector
 
 # Install dependencies
 pip install -r requirements.txt
@@ -65,19 +89,13 @@ pip install -r requirements.txt
 
 ### Usage
 
-#### 1. Interactive Terminal
-Supports **multi-line pasting**. Press **Enter twice** to submit your prompt.
+#### 1. Run Benchmarks
+Verify the accuracy and batch-optimized latency of the system on your hardware.
 ```bash
-python3 interactive_pipeline.py
+python benchmark_pipeline.py
 ```
 
-#### 2. Run Benchmarks
-Check the accuracy and batch-optimized latency of the system.
-```bash
-python3 benchmark_pipeline.py
-```
-
-#### 3. Python API (Batch Optimized)
+#### 2. Python API (Batch Optimized)
 ```python
 from prompt_injection_detector import GuardrailPipeline
 
@@ -90,7 +108,7 @@ results = pipeline.run_batch([
 ])
 
 for res in results:
-    print(f"Verdict: {res.verdict} | Status: {res.status}")
+    print(f"Verdict: {res.verdict} | Status: {res.status} | Latency: {res.confidence:.0%}")
 ```
 
 ---

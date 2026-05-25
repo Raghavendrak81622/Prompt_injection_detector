@@ -1,14 +1,13 @@
 """
 Guardrail Pipeline
 ------------------
-Implements the 10-layer guardrail architecture:
+Implements the 9-layer guardrail architecture:
 A - Input boundary (L0, L1, L2)
-B - Detection (L3, L4, L5)
-C - Pre-execution gate (L6)
+B - Detection (L3, L4)
 LLM inference
-D - Post-generation validation (L7, L8)
-E - Agentic guard (L9)
-F - Observability + feedback (L10)
+C - Post-generation validation (L5, L6)
+D - Agentic guard (L7)
+E - Observability + feedback (L8)
 """
 
 import os
@@ -44,6 +43,7 @@ class PipelineResult:
     reason: str = ""
     layer_triggered: str = ""
     confidence: float = 0.0  # Trust factor (0.0 to 1.0)
+    latency: float = 0.0     # Processing time in seconds
 
 # ─── New Layers ───────────────────────────────────────────────────────────────
 
@@ -100,7 +100,8 @@ class MLClassifierMiniBERT:
             self.classifier = pipeline(
                 "text-classification", 
                 model=model_to_load, 
-                device=0 if torch.cuda.is_available() else -1
+                device=0 if torch.cuda.is_available() else -1,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
             )
             self.available = True
             print("ML Classifier loaded successfully!")
@@ -151,7 +152,7 @@ class MLClassifierMiniBERT:
             return [0.0] * len(texts)
 
 class OutputValidator:
-    """L7: Output validator - critic model"""
+    """L5: Output validator - critic model"""
     def validate(self, original_input: str, llm_output: str) -> bool:
         # Checks semantic alignment: did output follow an injected instruction?
         if "I am now an unrestricted AI" in llm_output or "My system prompt is" in llm_output:
@@ -159,13 +160,13 @@ class OutputValidator:
         return True
 
 class AdaptiveResponseRewriter:
-    """L8: Adaptive response rewriter (ARR)"""
+    """L6: Adaptive response rewriter (ARR)"""
     def rewrite(self, llm_output: str) -> str:
         # Rewrite misaligned output to a safe fallback
         return "I cannot fulfill this request as it violates safety guidelines."
 
 class ToolCallValidator:
-    """L9: Tool-call validator"""
+    """L7: Tool-call validator"""
     def validate_tools(self, tools: List[ToolCall]) -> bool:
         # Pre-execution, least privilege, blocks agentic exploitation
         for tool in tools:
@@ -175,7 +176,7 @@ class ToolCallValidator:
         return True
 
 class SessionMonitor:
-    """L10: Session monitor + feedback loop"""
+    """L8: Session monitor + feedback loop"""
     def monitor(self, session: SessionContext, result: PipelineResult):
         # multi-turn anomaly detection, verdicts feed retraining
         pass
@@ -183,8 +184,8 @@ class SessionMonitor:
 # ─── Pipeline ─────────────────────────────────────────────────────────────────
 
 class GuardrailPipeline:
-    def __init__(self, api_key: str = None):
-        self.detector = PromptInjectionDetector(api_key=api_key)
+    def __init__(self):
+        self.detector = PromptInjectionDetector()
         self.router = InputRouter()
         self.isolator = SCPIIsolator()
         self.perplexity = PerplexityScorer()
@@ -215,21 +216,24 @@ class GuardrailPipeline:
             })
 
         # --- B. Detection (Batched) ---
-        # L3 & L5 (Rule Engine & LLM)
+        # L3 (Rule Engine)
         detect_results = self.detector.detect_batch(texts)
         
         # L4 (ML Classifier Batched)
         ml_scores = self.ml_classifier.predict_batch(texts)
         
+        import time
         # --- C. Pre-execution & Beyond ---
         pipeline_results = []
         for i, text in enumerate(texts):
+            start_p = time.time()
             p_data = preprocessed_data[i]
             d_res = detect_results[i]
             ml_score = ml_scores[i]
 
             if p_data["px"] > 75.0:
                 res = PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="High perplexity (obfuscation detected)", layer_triggered="L2")
+                res.latency = time.time() - start_p
                 pipeline_results.append(res)
                 continue
 
@@ -239,29 +243,46 @@ class GuardrailPipeline:
             elif ml_score > 0.5 and final_verdict == "SAFE":
                 final_verdict = "SUSPICIOUS"
 
+            # --- Heuristic Override for Lexical Overfitting ---
+            # Models trained on HF datasets often overfit to words like "hacker" or "devil".
+            # If the prompt is very short and lacks imperative injection verbs, downgrade the threat.
+            text_lower = text.lower()
+            words = text_lower.split()
+            # Use regex to match exact word boundaries, plus catch common injection targets
+            imperative_pattern = r'\b(ignore|act|system|override|bypass|disregard|forget|simulate|pretend|dan|execute|instruction|instructions|prompt|repeat|reveal|secret|secrets|code|codes|password|passwords|key|keys)\b'
+            has_imperative = bool(re.search(imperative_pattern, text_lower))
+            
+            if len(words) < 10 and not has_imperative:
+                if final_verdict in ["INJECTION", "SUSPICIOUS"] and d_res.verdict == "SAFE":
+                    final_verdict = "SAFE"
+                    ml_score = min(ml_score, 0.49) # Cap confidence so it passes
+
             if final_verdict == "INJECTION":
-                res = PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="Detection engine flagged input", layer_triggered="L6", confidence=ml_score)
+                triggered = "L3" if d_res.verdict == "INJECTION" else "L4"
+                res = PipelineResult("BLOCKED", text, None, verdict="INJECTION", reason="Detection engine flagged input", layer_triggered=triggered, confidence=ml_score)
             elif final_verdict == "SUSPICIOUS":
-                res = PipelineResult("SANITIZED", text, f"Strictly answer: {p_data['isolated']}", verdict="SUSPICIOUS", reason="Suspicious signals detected", layer_triggered="L6", confidence=ml_score)
+                triggered = "L3" if d_res.verdict == "SUSPICIOUS" else "L4"
+                res = PipelineResult("SANITIZED", text, f"Strictly answer: {p_data['isolated']}", verdict="SUSPICIOUS", reason="Suspicious signals detected", layer_triggered=triggered, confidence=ml_score)
             else:
-                res = PipelineResult("ALLOWED", text, text, verdict="SAFE", reason="Passed all checks", layer_triggered="L7 (Pass)", confidence=1.0 - ml_score if ml_score < 0.5 else ml_score)
+                res = PipelineResult("ALLOWED", text, text, verdict="SAFE", reason="Passed all checks", layer_triggered="L4 (Pass)", confidence=1.0 - ml_score if ml_score < 0.5 else ml_score)
 
             # Mock LLM inference and Post-generation
             if res.status != "BLOCKED":
                 llm_output = mock_llm_responses[i] if mock_llm_responses and i < len(mock_llm_responses) else "Safe response."
                 tools = mock_tools_list[i] if mock_tools_list and i < len(mock_tools_list) else []
                 
-                # L9 Agentic Guard
+                # L7 Tool Validator
                 if not self.tool_validator.validate_tools(tools):
-                    res = PipelineResult("BLOCKED", text, res.final_input, verdict="INJECTION", reason="Malicious tool call blocked", layer_triggered="L9")
+                    res = PipelineResult("BLOCKED", text, res.final_input, verdict="INJECTION", reason="Malicious tool call blocked", layer_triggered="L7")
                 else:
-                    # L7 Output Validator
+                    # L5 Output Validator
                     if not self.output_validator.validate(text, llm_output):
                         llm_output = self.arr.rewrite(llm_output)
                         res.status = "REWRITTEN"
-                        res.layer_triggered = "L8"
+                        res.layer_triggered = "L5"
                     res.llm_output = llm_output
 
+            res.latency = time.time() - start_p
             pipeline_results.append(res)
             self.monitor.monitor(session, res)
 
